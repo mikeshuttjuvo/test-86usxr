@@ -1,0 +1,1 @@
+This is a ruby on rails project that will provide a customer facing rest api.  The api allows customers to create locations and jobs.
