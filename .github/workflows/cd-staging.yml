@@ -1,0 +1,180 @@
+name: Staging Deployment
+
+on:
+  push:
+    branches:
+      - develop
+  workflow_dispatch:
+    inputs:
+      deploy_tag:
+        description: 'Specific version tag to deploy'
+        required: false
+        type: string
+      skip_migrations:
+        description: 'Skip database migrations'
+        required: false
+        type: boolean
+        default: false
+
+concurrency:
+  group: staging_environment
+  cancel-in-progress: false
+
+env:
+  AWS_REGION: us-west-2
+  ECR_REPOSITORY: ${{ secrets.ECR_REPOSITORY }}
+  ECS_CLUSTER: ${{ secrets.STAGING_ECS_CLUSTER }}
+  ECS_SERVICE: ${{ secrets.STAGING_ECS_SERVICE }}
+  HEALTH_CHECK_RETRIES: 5
+  HEALTH_CHECK_INTERVAL: 30
+  DEPLOYMENT_TIMEOUT: 600
+  RAILS_ENV: staging
+  DEPLOY_ENV: staging
+  HEALTH_CHECK_PATH: /api/v1/health
+
+permissions:
+  id-token: write
+  contents: read
+  packages: read
+
+jobs:
+  deploy:
+    name: Deploy to Staging
+    runs-on: ubuntu-latest
+    environment:
+      name: staging
+      url: https://api-staging.example.com
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v3
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v2
+        with:
+          role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Setup Docker Buildx
+        uses: docker/setup-buildx-action@v2
+
+      - name: Login to Amazon ECR
+        uses: aws-actions/amazon-ecr-login@v1
+        id: ecr-login
+
+      - name: Set deployment tag
+        id: set-tag
+        run: |
+          if [ -n "${{ github.event.inputs.deploy_tag }}" ]; then
+            echo "tag=${{ github.event.inputs.deploy_tag }}" >> $GITHUB_OUTPUT
+          else
+            echo "tag=staging-${GITHUB_SHA::8}" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Build and push Docker image
+        uses: docker/build-push-action@v4
+        with:
+          context: .
+          push: true
+          tags: |
+            ${{ steps.ecr-login.outputs.registry }}/${{ env.ECR_REPOSITORY }}:${{ steps.set-tag.outputs.tag }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+          build-args: |
+            RAILS_ENV=staging
+            BUILD_SHA=${{ github.sha }}
+            BUILD_DATE=$(date -u +'%Y-%m-%dT%H:%M:%SZ')
+
+      - name: Validate deployment configuration
+        run: |
+          chmod +x ./infrastructure/scripts/deploy.sh
+          chmod +x ./infrastructure/scripts/health-check.sh
+          ./infrastructure/scripts/health-check.sh validate_prerequisites
+
+      - name: Initialize blue-green deployment
+        id: init-deploy
+        run: |
+          echo "deployment_id=deploy-${GITHUB_SHA::8}-$(date +%s)" >> $GITHUB_OUTPUT
+          echo "start_time=$(date +%s)" >> $GITHUB_OUTPUT
+
+      - name: Run database migrations
+        if: ${{ !github.event.inputs.skip_migrations }}
+        run: |
+          source ./infrastructure/scripts/deploy.sh
+          run_database_migrations "${{ steps.set-tag.outputs.tag }}"
+
+      - name: Deploy new task definition
+        id: deploy
+        run: |
+          source ./infrastructure/scripts/deploy.sh
+          deploy_blue_green "${{ steps.set-tag.outputs.tag }}" "${{ steps.init-deploy.outputs.deployment_id }}"
+
+      - name: Perform health checks
+        run: |
+          source ./infrastructure/scripts/health-check.sh
+          for i in $(seq 1 ${{ env.HEALTH_CHECK_RETRIES }}); do
+            if verify_application_health; then
+              exit 0
+            fi
+            sleep ${{ env.HEALTH_CHECK_INTERVAL }}
+          done
+          exit 1
+
+      - name: Switch traffic to new deployment
+        if: success()
+        run: |
+          source ./infrastructure/scripts/deploy.sh
+          finalize_blue_green_deployment "${{ steps.init-deploy.outputs.deployment_id }}"
+
+      - name: Verify deployment stability
+        run: |
+          source ./infrastructure/scripts/health-check.sh
+          verify_deployment_stability 300
+
+      - name: Rollback on failure
+        if: failure()
+        run: |
+          source ./infrastructure/scripts/rollback.sh
+          rollback_deployment "${{ steps.init-deploy.outputs.deployment_id }}"
+
+      - name: Cleanup old deployments
+        if: always()
+        run: |
+          source ./infrastructure/scripts/deploy.sh
+          cleanup_old_deployments "${{ env.ECS_CLUSTER }}" "${{ env.ECS_SERVICE }}"
+
+      - name: Update deployment metrics
+        if: always()
+        run: |
+          DEPLOY_DURATION=$(($(date +%s) - ${{ steps.init-deploy.outputs.start_time }}))
+          aws cloudwatch put-metric-data \
+            --namespace "RailsAPI/Deployments" \
+            --metric-name "DeploymentDuration" \
+            --value $DEPLOY_DURATION \
+            --unit Seconds \
+            --dimensions Environment=staging
+
+      - name: Notify Slack on failure
+        if: failure()
+        uses: slackapi/slack-github-action@v1.24.0
+        with:
+          channel-id: ${{ secrets.SLACK_CHANNEL_DEPLOYMENTS }}
+          slack-message: "❌ Staging deployment failed for commit ${{ github.sha }}"
+        env:
+          SLACK_BOT_TOKEN: ${{ secrets.SLACK_BOT_TOKEN }}
+
+      - name: Notify Slack on success
+        if: success()
+        uses: slackapi/slack-github-action@v1.24.0
+        with:
+          channel-id: ${{ secrets.SLACK_CHANNEL_DEPLOYMENTS }}
+          slack-message: "✅ Staging deployment successful for commit ${{ github.sha }}"
+        env:
+          SLACK_BOT_TOKEN: ${{ secrets.SLACK_BOT_TOKEN }}
+
+outputs:
+  deployment_status:
+    success: ${{ job.status == 'success' }}
+    environment_url: ${{ steps.deploy.outputs.environment_url }}
+    deployment_id: ${{ steps.init-deploy.outputs.deployment_id }}
+    rollback_tag: ${{ steps.set-tag.outputs.tag }}
