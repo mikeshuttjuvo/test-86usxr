@@ -1,0 +1,59 @@
+# PostgreSQL Database Configuration
+# Using pg ~> 1.5.0 and activerecord ~> 7.0.0
+
+default: &default
+  adapter: postgresql
+  encoding: unicode
+  pool: <%= ENV.fetch('RAILS_MAX_THREADS') { 5 } %>
+  connect_timeout: 2
+  checkout_timeout: 5
+  variables:
+    statement_timeout: 5000
+    lock_timeout: 5000
+    idle_in_transaction_session_timeout: 30000
+
+development:
+  <<: *default
+  database: api_service_development
+  host: localhost
+  port: 5432
+  username: <%= ENV['DATABASE_USERNAME'] %>
+  password: <%= ENV['DATABASE_PASSWORD'] %>
+
+test:
+  <<: *default
+  database: api_service_test
+  host: localhost
+  port: 5432
+  username: <%= ENV['DATABASE_USERNAME'] %>
+  password: <%= ENV['DATABASE_PASSWORD'] %>
+
+production:
+  <<: *default
+  url: <%= ENV['DATABASE_URL'] %>
+  database: <%= ENV['DATABASE_NAME'] %>
+  username: <%= ENV['DATABASE_USERNAME'] %>
+  password: <%= ENV['DATABASE_PASSWORD'] %>
+  host: <%= ENV['DATABASE_HOST'] %>
+  port: <%= ENV['DATABASE_PORT'] %>
+  pool: <%= ENV.fetch('RAILS_MAX_THREADS') { 10 } %>
+  reaping_frequency: 10
+  prepared_statements: true
+  statement_limit: 200
+  variables:
+    statement_timeout: 5000
+    lock_timeout: 5000
+    idle_in_transaction_session_timeout: 60000
+
+  # Read replica configuration for high availability
+  replica:
+    replica_host: <%= ENV['DATABASE_REPLICA_HOST'] %>
+    replica_port: <%= ENV['DATABASE_REPLICA_PORT'] %>
+    replica_username: <%= ENV['DATABASE_REPLICA_USERNAME'] %>
+    replica_password: <%= ENV['DATABASE_REPLICA_PASSWORD'] %>
+    database: <%= ENV['DATABASE_NAME'] %>
+    pool: <%= ENV.fetch('RAILS_MAX_THREADS') { 10 } %>
+    reaping_frequency: 10
+    variables:
+      statement_timeout: 10000
+      lock_timeout: 10000
