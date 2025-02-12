@@ -1,0 +1,72 @@
+# Local storage for development environment
+# Permissions are restricted for security (0600 for files, 0700 for directories)
+local:
+  service: Disk
+  root: storage/local
+  permissions:
+    files: "0600"
+    directories: "0700"
+
+# Test environment storage configuration
+# Isolated storage path with restricted permissions
+test:
+  service: Disk
+  root: storage/test
+  permissions:
+    files: "0600"
+    directories: "0700"
+
+# Production S3 storage configuration with enhanced security and performance
+# aws-sdk-s3 ~> 1.0 required
+amazon:
+  service: S3
+  access_key_id: <%= ENV['AWS_ACCESS_KEY_ID'] %>
+  secret_access_key: <%= ENV['AWS_SECRET_ACCESS_KEY'] %>
+  region: <%= ENV['AWS_REGION'] %>
+  bucket: <%= ENV['AWS_BUCKET'] %>
+  
+  # Security Configuration
+  encryption: true
+  server_side_encryption: AES256
+  public: false
+  versioning: true
+
+  # Upload Configuration
+  upload:
+    multipart_threshold: 100MB
+    multipart_chunk_size: 25MB
+    cache_control: "public, max-age=31536000"
+    expires: <%= 1.year %>
+    content_disposition: attachment
+    content_type: application/octet-stream
+    retry_limit: 5
+    retry_delay: 1
+
+  # CORS Configuration
+  cors_configuration:
+    allowed_origins: <%= ENV['ALLOWED_ORIGINS'] %>
+    allowed_methods:
+      - GET
+      - PUT
+      - POST
+      - DELETE
+    max_age_seconds: 3600
+
+  # Lifecycle Rules for Cost Optimization
+  lifecycle_rules:
+    transition_to_ia: <%= 30.days %>
+    transition_to_glacier: <%= 90.days %>
+    expiration: <%= 365.days %>
+
+  # Access Logging Configuration
+  logging:
+    enabled: true
+    target_bucket: <%= ENV['AWS_LOG_BUCKET'] %>
+    target_prefix: storage-logs/
+
+  # Backup and Disaster Recovery Configuration
+  backup:
+    cross_region_replication:
+      enabled: true
+      destination_region: <%= ENV['AWS_BACKUP_REGION'] %>
+      destination_bucket: <%= ENV['AWS_BACKUP_BUCKET'] %>
