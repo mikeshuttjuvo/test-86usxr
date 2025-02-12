@@ -1,0 +1,117 @@
+# Version Control
+.git
+.gitignore
+.gitattributes
+
+# Logs and Temporary Files
+log/*
+tmp/*
+!tmp/.keep
+storage/*
+!storage/.keep
+
+# Environment and Credentials
+.env*
+.env.local
+.env.development
+.env.test
+.env.production
+config/master.key
+config/credentials.yml.enc
+
+# Test and Coverage
+spec/*
+test/*
+features/*
+coverage/*
+.rspec
+.simplecov
+
+# Development Tools
+.bundle/*
+.byebug_history
+.rubocop.yml
+.rubocop_todo.yml
+.ruby-version
+.ruby-gemset
+.tool-versions
+
+# Documentation
+*.md
+doc/*
+README*
+CHANGELOG*
+LICENSE*
+CONTRIBUTING*
+
+# Node.js
+node_modules/*
+yarn-debug.log*
+yarn-error.log*
+package.json
+package-lock.json
+yarn.lock
+
+# Docker
+Dockerfile*
+docker-compose*.yml
+.dockerignore
+
+# OS Generated
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+
+# IDE and Editor
+.idea/*
+.vscode/*
+*.swp
+*.swo
+*~
+
+# Cache and Local Data
+.sass-cache/*
+public/assets/*
+public/packs/*
+public/system/*
+
+# Deployment
+.circleci/*
+.github/*
+.gitlab-ci.yml
+capfile
+config/deploy/*
+
+# Misc Development Files
+.babelrc
+.browserslistrc
+.editorconfig
+.eslintignore
+.eslintrc*
+.prettierrc*
+.stylelintrc*
+postcss.config.js
+babel.config.js
+webpack.config.js
+
+# Backup Files
+*.bak
+*.swp
+*.swo
+*~
+*.orig
+
+# Local Development Databases
+*.sqlite3
+*.sqlite3-journal
+db/*.sqlite3
+db/*.sqlite3-journal
+
+# Compiled Assets
+public/assets/*
+public/packs/*
+public/packs-test/*
