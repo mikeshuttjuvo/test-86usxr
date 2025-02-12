@@ -1,0 +1,91 @@
+# Sidekiq configuration version ~> 7.0.0
+# This file defines environment-specific settings for Sidekiq background job processing
+
+# Development environment configuration
+development:
+  # Number of concurrent threads for job processing
+  concurrency: 5
+  
+  # Queue definitions with relative priority (higher number = higher priority)
+  queues:
+    - [critical, 5]
+    - [default, 3]
+    - [low, 1]
+  
+  # Enable scheduler for recurring jobs
+  scheduler: true
+
+# Test environment configuration
+test:
+  # Reduced concurrency for test environment
+  concurrency: 3
+  
+  # Test environment queues
+  queues:
+    - [critical, 5]
+    - [default, 3]
+    - [low, 1]
+  
+  # Disable scheduler in test environment
+  scheduler: false
+
+# Production environment configuration
+production:
+  # Optimized concurrency for production workloads
+  concurrency: 25
+  
+  # Production queues with priority weights
+  queues:
+    - [critical, 5]
+    - [default, 3]
+    - [audit, 2]
+    - [low, 1]
+    - [maintenance, 1]
+  
+  # Job processing settings
+  timeout: 8
+  poll_interval: 2
+  max_retries: 10
+  
+  # Enable scheduler for production
+  scheduler: true
+  
+  # Process identification
+  pid: /tmp/sidekiq.pid
+  
+  # Logging configuration
+  logfile: /var/log/sidekiq.log
+  
+  # Error tracking integration
+  error_handlers:
+    - Datadog
+  
+  # Resource management
+  dead_job_threshold: 10000
+  memory_threshold: 1024MB
+  
+  # Queue-specific settings
+  queue_weights:
+    critical: 5      # Time-sensitive operations
+    default: 3       # Standard background jobs
+    audit: 2         # System event tracking
+    low: 1          # Non-urgent tasks
+    maintenance: 1   # System maintenance
+  
+  # Advanced tuning
+  reliable_scheduler: true
+  strict: true
+  environment: production
+  tag: <%= ENV['DEPLOYMENT_TAG'] %>
+  
+  # Connection pool settings
+  pool_size: <%= ENV.fetch('RAILS_MAX_THREADS', 25) %>
+  
+  # Monitoring configuration
+  statsd:
+    host: <%= ENV['STATSD_HOST'] %>
+    port: <%= ENV['STATSD_PORT'] %>
+    namespace: sidekiq
+  
+  # Health check settings
+  health_check_interval: 30
