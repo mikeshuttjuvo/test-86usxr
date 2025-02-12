@@ -1,0 +1,94 @@
+# Security and credentials
+.env
+.env.*
+*.env
+config/master.key
+config/credentials.yml.enc
+*.pem
+*.key
+*.crt
+*.p12
+*.pfx
+*_rsa
+*_dsa
+*.pub
+*-credentials.json
+kubeconfig
+*.pem.key
+
+# Logs, temporary files, and sockets
+/log/
+/tmp/
+*.log
+*.tmp
+*.bak
+*.backup
+*.pid
+*.sock
+dump.rdb
+
+# Dependencies and packages
+/node_modules/
+/.bundle/
+/vendor/bundle/
+yarn-error.log
+.yarn-integrity
+package-lock.json
+
+# Database files
+*.sqlite3
+*.sqlite3-journal
+/db/*.sqlite3
+/db/*.sqlite3-journal
+
+# Test and coverage
+/coverage/
+/spec/tmp
+.rspec
+capybara-*.html
+
+# IDE and editor files
+.idea/
+.vscode/
+*.swp
+*.swo
+*.swn
+*.swm
+.project
+.settings/
+*.sublime-workspace
+*.sublime-project
+
+# OS generated files
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+
+# Rails specific
+*.rbc
+/public/system
+/public/assets
+/public/packs
+/public/packs-test
+/storage/
+.byebug_history
+**.orig
+
+# Infrastructure and deployment
+.terraform/
+*.tfstate
+*.tfstate.*
+*.tfvars
+.terraformrc
+terraform.rc
+
+# Docker
+.docker/
+*.env.docker
+
+# Local overrides
+.gitignore.local
