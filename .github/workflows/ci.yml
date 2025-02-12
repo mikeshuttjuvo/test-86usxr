@@ -1,0 +1,198 @@
+name: CI
+
+on:
+  push:
+    branches: [ main, develop ]
+  pull_request:
+    branches: [ main, develop ]
+
+env:
+  RUBY_VERSION: 3.2.0
+  BUNDLER_VERSION: 2.4.0
+  RAILS_ENV: test
+  DATABASE_URL: postgres://postgres:postgres@localhost:5432/rails_test
+  REDIS_URL: redis://localhost:6379/0
+  COVERAGE: true
+
+jobs:
+  test:
+    name: Tests & Coverage
+    runs-on: ubuntu-latest
+
+    services:
+      postgres:
+        image: postgres:14
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: rails_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
+      redis:
+        image: redis:6.2
+        ports:
+          - 6379:6379
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+
+      - name: Set up Ruby
+        uses: ruby/setup-ruby@v1
+        with:
+          ruby-version: ${{ env.RUBY_VERSION }}
+          bundler-version: ${{ env.BUNDLER_VERSION }}
+          bundler-cache: true
+
+      - name: Install PostgreSQL client
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libpq-dev
+
+      - name: Install dependencies
+        run: |
+          gem install bundler -v ${{ env.BUNDLER_VERSION }}
+          bundle config set --local path 'vendor/bundle'
+          bundle install --jobs 4 --retry 3
+
+      - name: Setup test database
+        run: |
+          bundle exec rails db:create
+          bundle exec rails db:schema:load
+
+      - name: Run RSpec tests with coverage
+        run: bundle exec rspec --format documentation
+
+      - name: Upload coverage reports
+        uses: actions/upload-artifact@v3
+        with:
+          name: coverage-report
+          path: coverage/
+          retention-days: 14
+
+  lint:
+    name: Code Quality
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+
+      - name: Set up Ruby
+        uses: ruby/setup-ruby@v1
+        with:
+          ruby-version: ${{ env.RUBY_VERSION }}
+          bundler-version: ${{ env.BUNDLER_VERSION }}
+          bundler-cache: true
+
+      - name: Install dependencies
+        run: |
+          gem install bundler -v ${{ env.BUNDLER_VERSION }}
+          bundle config set --local path 'vendor/bundle'
+          bundle install --jobs 4 --retry 3
+
+      - name: Run RuboCop
+        run: bundle exec rubocop --parallel --fail-level error
+
+      - name: Run ERB Lint
+        run: bundle exec erblint --lint-all
+
+      - name: Run YAML Lint
+        run: |
+          gem install yamllint
+          yamllint .
+
+  security:
+    name: Security Scan
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+
+      - name: Set up Ruby
+        uses: ruby/setup-ruby@v1
+        with:
+          ruby-version: ${{ env.RUBY_VERSION }}
+          bundler-version: ${{ env.BUNDLER_VERSION }}
+          bundler-cache: true
+
+      - name: Install dependencies
+        run: |
+          gem install bundler -v ${{ env.BUNDLER_VERSION }}
+          bundle config set --local path 'vendor/bundle'
+          bundle install --jobs 4 --retry 3
+
+      - name: Run Brakeman
+        run: |
+          bundle exec brakeman -A -w1 -z --no-pager --format json --output security-reports/brakeman.json
+
+      - name: Run Bundle Audit
+        run: |
+          bundle exec bundle-audit update
+          bundle exec bundle-audit check --format json --output security-reports/bundle-audit.json
+
+      - name: Run OWASP Dependency Check
+        uses: dependency-check/Dependency-Check_Action@main
+        with:
+          project: 'rails-api'
+          path: '.'
+          format: 'JSON'
+          out: 'security-reports'
+
+      - name: Upload security reports
+        uses: actions/upload-artifact@v3
+        with:
+          name: security-reports
+          path: security-reports/
+          retention-days: 30
+
+  notify:
+    name: Notifications
+    needs: [test, lint, security]
+    runs-on: ubuntu-latest
+    if: always()
+
+    steps:
+      - name: Check workflow status
+        uses: technote-space/workflow-conclusion-action@v3
+
+      - name: Send Slack notification
+        if: env.WORKFLOW_CONCLUSION == 'failure'
+        uses: 8398a7/action-slack@v3
+        with:
+          status: ${{ env.WORKFLOW_CONCLUSION }}
+          fields: repo,message,commit,author,action,workflow
+        env:
+          SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
+
+      - name: Send email notification
+        if: env.WORKFLOW_CONCLUSION == 'failure'
+        uses: dawidd6/action-send-mail@v3
+        with:
+          server_address: ${{ secrets.SMTP_SERVER }}
+          server_port: ${{ secrets.SMTP_PORT }}
+          username: ${{ secrets.SMTP_USERNAME }}
+          password: ${{ secrets.SMTP_PASSWORD }}
+          subject: CI Pipeline Failed - ${{ github.repository }}
+          body: Workflow ${{ github.workflow }} failed on ${{ github.repository }}
+          to: ${{ secrets.NOTIFICATION_EMAIL }}
+          from: CI Pipeline <noreply@example.com>
+
+cache:
+  paths:
+    - vendor/bundle
+    - node_modules
+    - .bundle
+  key: v1-dependencies-${{ runner.os }}-${{ hashFiles('**/Gemfile.lock') }}
