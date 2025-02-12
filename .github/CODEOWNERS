@@ -1,0 +1,77 @@
+# Default owners for everything in the repo
+# Requires review from API team leads for any unmatched files
+* @api-team-leads
+
+# API Controllers - Owned by API team
+src/backend/app/controllers/**/* @api-team
+
+# Data Models - Owned by both API and Data teams
+src/backend/app/models/**/* @api-team @data-team
+
+# Authentication Services - Owned by Security team
+src/backend/app/services/auth/**/* @security-team
+
+# Database Configuration - Owned by Data team
+src/backend/config/database.yml @data-team
+
+# Database Migrations and Schema - Owned by Data team
+src/backend/db/**/* @data-team
+
+# Infrastructure Code - Owned by DevOps team
+infrastructure/**/* @devops-team
+
+# CI/CD Workflows - Owned by DevOps team
+.github/workflows/**/* @devops-team
+
+# Dependencies Management - Requires both API leads and Security team review
+src/backend/Gemfile* @api-team-leads @security-team
+
+# Application Initialization - Requires both API leads and Security team review
+src/backend/config/initializers/**/* @api-team-leads @security-team
+
+# Test Suite - Owned by API team
+src/backend/spec/**/* @api-team
+
+# Security-related Configuration - Owned by Security team
+src/backend/config/security/**/* @security-team
+
+# API Documentation - Owned by API team
+docs/api/**/* @api-team
+
+# Performance Monitoring - Owned by DevOps team
+src/backend/config/newrelic.yml @devops-team
+src/backend/config/datadog.yml @devops-team
+
+# Cache Configuration - Owned by DevOps team
+src/backend/config/redis/**/* @devops-team
+
+# Background Jobs - Owned by API team
+src/backend/app/jobs/**/* @api-team
+
+# API Serializers - Owned by API team
+src/backend/app/serializers/**/* @api-team
+
+# Service Objects - Owned by API team
+src/backend/app/services/**/* @api-team
+
+# Environment Configuration - Requires both DevOps and Security team review
+src/backend/config/environments/**/* @devops-team @security-team
+
+# Docker Configuration - Owned by DevOps team
+**/Dockerfile* @devops-team
+docker-compose*.yml @devops-team
+
+# Deployment Configuration - Owned by DevOps team
+kubernetes/**/* @devops-team
+terraform/**/* @devops-team
+
+# Code Quality Configuration - Owned by API team leads
+src/backend/.rubocop.yml @api-team-leads
+src/backend/.rspec @api-team-leads
+
+# Security Scanning Configuration - Owned by Security team
+src/backend/.brakeman.yml @security-team
+src/backend/config/brakeman.ignore @security-team
+
+# API Gateway Configuration - Requires both DevOps and Security team review
+config/nginx/**/* @devops-team @security-team
