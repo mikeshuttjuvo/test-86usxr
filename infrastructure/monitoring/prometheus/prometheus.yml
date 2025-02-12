@@ -1,0 +1,93 @@
+# Prometheus Configuration v2.40.0
+# Enterprise-grade monitoring setup for REST API service and infrastructure
+
+# Global configuration
+global:
+  scrape_interval: 15s
+  evaluation_interval: 15s
+  scrape_timeout: 10s
+  external_labels:
+    environment: ${ENV}
+    region: ${AWS_REGION}
+    application: rest-api-service
+
+# Rule files for recording and alerting
+rule_files:
+  - /etc/prometheus/rules/recording_rules.yml
+  - /etc/prometheus/rules/alerting_rules.yml
+  - /etc/prometheus/rules/slo_rules.yml
+
+# Scrape configurations
+scrape_configs:
+  # Rails API Application Metrics
+  - job_name: rails-api
+    metrics_path: /metrics
+    scrape_interval: 10s
+    scheme: https
+    tls_config:
+      cert_file: /etc/prometheus/certs/client.crt
+      key_file: /etc/prometheus/certs/client.key
+      ca_file: /etc/prometheus/certs/ca.crt
+    static_configs:
+      - targets: ['rails-api:9394']
+        labels:
+          service: rest-api
+          environment: ${ENV}
+          component: application
+    metric_relabel_configs:
+      - source_labels: ['__name__']
+        regex: 'http_request_duration_seconds.*'
+        action: keep
+
+  # Node Exporter System Metrics
+  - job_name: node-exporter
+    metrics_path: /metrics
+    scrape_interval: 30s
+    static_configs:
+      - targets: ['node-exporter:9100']
+        labels:
+          service: system-metrics
+          environment: ${ENV}
+          component: infrastructure
+
+  # Redis Exporter Metrics
+  - job_name: redis-exporter
+    metrics_path: /metrics
+    scrape_interval: 15s
+    static_configs:
+      - targets: ['redis-exporter:9121']
+        labels:
+          service: redis
+          environment: ${ENV}
+          component: cache
+
+  # PostgreSQL Exporter Metrics
+  - job_name: postgres-exporter
+    metrics_path: /metrics
+    scrape_interval: 15s
+    static_configs:
+      - targets: ['postgres-exporter:9187']
+        labels:
+          service: postgresql
+          environment: ${ENV}
+          component: database
+
+# Alertmanager configuration
+alerting:
+  alertmanagers:
+    - scheme: https
+      tls_config:
+        cert_file: /etc/prometheus/certs/alertmanager-client.crt
+        key_file: /etc/prometheus/certs/alertmanager-client.key
+        ca_file: /etc/prometheus/certs/alertmanager-ca.crt
+      static_configs:
+        - targets: ['alertmanager:9093']
+
+# Storage configuration
+storage:
+  tsdb:
+    retention_time: 15d
+    retention_size: 50GB
+    wal_compression: true
+    min_block_duration: 2h
+    max_block_duration: 24h
