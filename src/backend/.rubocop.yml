@@ -1,0 +1,110 @@
+# frozen_string_literal: true
+
+# RuboCop version: ~> 1.50
+# rubocop-rails version: ~> 2.19
+# rubocop-performance version: ~> 1.17
+# rubocop-rspec version: ~> 2.22
+
+inherit_mode:
+  merge:
+    - Exclude
+
+require:
+  - rubocop-rails
+  - rubocop-performance
+  - rubocop-rspec
+
+inherit_gem:
+  rubocop-rails: config/rails.yml
+
+AllCops:
+  NewCops: enable
+  TargetRubyVersion: 3.2
+  Exclude:
+    - 'bin/**/*'
+    - 'db/schema.rb'
+    - 'db/migrate/**/*'
+    - 'vendor/**/*'
+    - 'node_modules/**/*'
+    - 'tmp/**/*'
+    - 'log/**/*'
+    - 'public/**/*'
+  EnabledByDefault: true
+  SafeAutoCorrect: true
+
+Style:
+  Documentation:
+    Enabled: true
+    Exclude:
+      - 'spec/**/*'
+      - 'test/**/*'
+  FrozenStringLiteralComment:
+    Enabled: true
+    EnforcedStyle: always
+  StringLiterals:
+    Enabled: true
+    EnforcedStyle: single_quotes
+  ClassAndModuleChildren:
+    Enabled: true
+    EnforcedStyle: nested
+  HashSyntax:
+    Enabled: true
+    EnforcedStyle: ruby19
+
+Metrics:
+  BlockLength:
+    Exclude:
+      - 'spec/**/*'
+      - 'config/routes.rb'
+      - 'config/environments/**/*'
+    Max: 25
+  MethodLength:
+    Max: 20
+    CountComments: false
+  AbcSize:
+    Max: 20
+  CyclomaticComplexity:
+    Max: 10
+  PerceivedComplexity:
+    Max: 10
+  ClassLength:
+    Max: 200
+
+Layout:
+  LineLength:
+    Max: 120
+    Exclude:
+      - 'spec/**/*'
+  IndentationWidth:
+    Width: 2
+  EmptyLinesAroundClassBody:
+    EnforcedStyle: empty_lines
+
+Rails:
+  EnforcedStyle: slashes
+  BulkChangeTable:
+    Enabled: true
+  CreateTableWithTimestamps:
+    Enabled: true
+  NotNullColumn:
+    Enabled: true
+  SkipsModelValidations:
+    Enabled: true
+
+Performance:
+  Enabled: true
+  AncestorsInclude:
+    SafeAutoCorrect: true
+  CollectionLiteralInLoop:
+    MinSize: 2
+
+RSpec:
+  Enabled: true
+  DescribedClass:
+    Enabled: true
+  EmptyExampleGroup:
+    Enabled: true
+  ExampleLength:
+    Max: 10
+  MultipleExpectations:
+    Max: 3
