@@ -1,0 +1,163 @@
+name: Production Deployment
+
+on:
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+    inputs:
+      deploy_tag:
+        description: 'Git tag to deploy'
+        required: true
+        type: string
+      skip_migrations:
+        description: 'Skip database migrations'
+        required: false
+        type: boolean
+        default: false
+      traffic_shift_percentage:
+        description: 'Percentage of traffic to shift to new deployment'
+        required: false
+        type: number
+        default: 10
+
+concurrency:
+  group: production_environment
+  cancel-in-progress: false
+
+env:
+  AWS_REGION: us-west-2
+  ECR_REPOSITORY: ${{ secrets.ECR_REPOSITORY }}
+  ECS_CLUSTER: ${{ secrets.PRODUCTION_ECS_CLUSTER }}
+  ECS_SERVICE: ${{ secrets.PRODUCTION_ECS_SERVICE }}
+  HEALTH_CHECK_RETRIES: 5
+  HEALTH_CHECK_INTERVAL: 30
+  DEPLOYMENT_TIMEOUT: 1800
+  RAILS_ENV: production
+  DEPLOY_ENV: production
+  DEPLOYMENT_STRATEGY: BLUE_GREEN
+
+permissions:
+  id-token: write
+  contents: read
+
+jobs:
+  deploy:
+    name: Deploy to Production
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    environment:
+      name: production
+      url: https://api.example.com
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+        with:
+          fetch-depth: 0
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v2
+        with:
+          role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Login to Amazon ECR
+        uses: aws-actions/amazon-ecr-login@v1
+        id: ecr-login
+
+      - name: Setup Docker Buildx
+        uses: docker/setup-buildx-action@v2
+        with:
+          buildkitd-flags: --debug
+
+      - name: Build and push Docker image
+        uses: docker/build-push-action@v4
+        with:
+          context: .
+          push: true
+          tags: |
+            ${{ steps.ecr-login.outputs.registry }}/${{ env.ECR_REPOSITORY }}:${{ github.sha }}
+            ${{ steps.ecr-login.outputs.registry }}/${{ env.ECR_REPOSITORY }}:latest
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+          build-args: |
+            RAILS_ENV=production
+            BUILD_SHA=${{ github.sha }}
+            BUILD_DATE=$(date -u +'%Y-%m-%dT%H:%M:%SZ')
+
+      - name: Validate deployment prerequisites
+        run: |
+          chmod +x ./infrastructure/scripts/deploy.sh
+          source ./infrastructure/scripts/deploy.sh
+          validate_prerequisites
+
+      - name: Create new ECS task definition
+        id: task-def
+        run: |
+          TASK_DEF_ARN=$(./infrastructure/scripts/deploy.sh register_task_definition "${{ github.sha }}")
+          echo "::set-output name=arn::$TASK_DEF_ARN"
+
+      - name: Run database migrations
+        if: ${{ !inputs.skip_migrations }}
+        run: |
+          source ./infrastructure/scripts/deploy.sh
+          run_database_migrations "${{ steps.task-def.outputs.arn }}"
+
+      - name: Deploy blue environment
+        id: deploy
+        run: |
+          source ./infrastructure/scripts/deploy.sh
+          update_service "${{ steps.task-def.outputs.arn }}"
+
+      - name: Perform health checks
+        run: |
+          source ./infrastructure/scripts/health-check.sh
+          for i in $(seq 1 ${{ env.HEALTH_CHECK_RETRIES }}); do
+            if verify_deployment; then
+              exit 0
+            fi
+            sleep ${{ env.HEALTH_CHECK_INTERVAL }}
+          done
+          exit 1
+
+      - name: Gradually shift traffic
+        run: |
+          source ./infrastructure/scripts/deploy.sh
+          STEP_SIZE="${{ inputs.traffic_shift_percentage || 10 }}"
+          for percent in $(seq $STEP_SIZE 10 100); do
+            shift_traffic "${{ steps.task-def.outputs.arn }}" "$percent"
+            sleep 30
+            if ! verify_deployment; then
+              echo "Health check failed at ${percent}% traffic"
+              exit 1
+            fi
+          done
+
+      - name: Monitor deployment metrics
+        run: |
+          source ./infrastructure/scripts/health-check.sh
+          check_system_resources
+
+      - name: Cleanup old deployments
+        if: always()
+        run: |
+          source ./infrastructure/scripts/deploy.sh
+          cleanup_deployment
+
+      - name: Notify Slack
+        uses: 8398a7/action-slack@v3
+        if: always()
+        with:
+          status: ${{ job.status }}
+          fields: repo,message,commit,author,action,eventName,ref,workflow,job,took
+          text: "Production Deployment ${{ job.status }}"
+        env:
+          SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
+
+outputs:
+  deployment_status:
+    success: ${{ job.status == 'success' }}
+    environment_url: https://api.example.com
+    deployment_id: ${{ github.sha }}
+    rollback_tag: ${{ github.event.before }}
