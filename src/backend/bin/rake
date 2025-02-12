@@ -1,0 +1,89 @@
+#!/usr/bin/env ruby
+# frozen_string_literal: true
+
+# Version: rake ~> 13.0, bundler ~> 2.4
+# Purpose: Enhanced rake task runner with cloud-native deployment and performance monitoring support
+
+begin
+  # Initialize performance monitoring
+  start_time = Process.clock_gettime(Process::CLOCK_MONOTONIC)
+
+  # Load the boot configuration which sets up the environment
+  require_relative '../config/boot'
+
+  # Configure Bundler environment with proper gem isolation
+  require 'bundler/setup'
+
+  # Load core rake functionality
+  require 'rake'
+
+  # Configure environment-specific settings
+  if ENV['RAILS_ENV'] == 'production'
+    # Production optimizations
+    ENV['RAKE_WORKER_THREADS'] = ENV['RAKE_WORKER_THREADS'] || '4'
+    ENV['RAKE_RETRY_COUNT'] = ENV['RAKE_RETRY_COUNT'] || '3'
+    
+    # Enable performance monitoring in production
+    require 'benchmark'
+  end
+
+  # Validate minimum resource requirements for cloud deployment
+  if ENV['CONTAINER_DEPLOYMENT'] == 'true'
+    begin
+      # Check available memory (minimum 512MB)
+      total_memory = `grep MemTotal /proc/meminfo`.split[1].to_i
+      raise 'Insufficient memory' if total_memory && total_memory < 524288 # 512MB in KB
+
+      # Check available CPU cores (minimum 1 core)
+      cpu_cores = `nproc`.to_i
+      raise 'Insufficient CPU cores' if cpu_cores && cpu_cores < 1
+
+      # Check available disk space (minimum 1GB)
+      disk_space = `df -k . | tail -1 | awk '{print $4}'`.to_i
+      raise 'Insufficient disk space' if disk_space && disk_space < 1048576 # 1GB in KB
+    rescue StandardError => e
+      warn "[RAKE] Resource validation failed: #{e.message}"
+      raise e if ENV['STRICT_RESOURCE_VALIDATION'] == 'true'
+    end
+  end
+
+  # Initialize Rake application with enhanced error handling
+  rake_app = Rake.application
+  rake_app.init('rake')
+
+  # Load Rake tasks with environment awareness
+  rake_app.load_rakefile
+
+  # Process command line arguments
+  rake_app.top_level
+
+  # Calculate and log execution metrics in production
+  if ENV['RAILS_ENV'] == 'production'
+    duration = Process.clock_gettime(Process::CLOCK_MONOTONIC) - start_time
+    warn "[RAKE] Task completed in #{duration.round(4)}s"
+    
+    # Log resource usage
+    memory_usage = `ps -o rss= -p #{Process.pid}`.to_i / 1024 # Convert to MB
+    warn "[RAKE] Memory usage: #{memory_usage}MB"
+  end
+
+  exit 0
+rescue SystemExit => e
+  # Preserve system exit status
+  exit e.status
+rescue Exception => e
+  # Enhanced error reporting
+  warn "[RAKE] Error executing rake task: #{e.message}"
+  warn "[RAKE] Error type: #{e.class}"
+  warn "[RAKE] Backtrace:"
+  warn e.backtrace.join("\n")
+  
+  # Log additional context in production
+  if ENV['RAILS_ENV'] == 'production'
+    warn "[RAKE] Environment: #{ENV['RAILS_ENV']}"
+    warn "[RAKE] Ruby version: #{RUBY_VERSION}"
+    warn "[RAKE] Arguments: #{ARGV.join(' ')}"
+  end
+  
+  exit 1
+end
