@@ -1,0 +1,181 @@
+# Datadog Agent Configuration v7.40.0
+# Purpose: Comprehensive monitoring configuration for REST API service
+
+# API Configuration
+api:
+  key: ${DD_API_KEY}
+  site: ${DD_SITE}
+
+# APM Configuration
+apm_config:
+  enabled: true
+  env: ${DD_ENV}
+  apm_non_local_traffic: true
+  max_traces_per_second: 100
+  max_memory: 500000000  # 500MB
+  log_file: /var/log/datadog/trace-agent.log
+  analyzed_spans:
+    rest-api|rack.request: 1.0
+    rest-api|location.operation: 1.0
+    rest-api|job.operation: 1.0
+    rest-api|auth.operation: 1.0
+
+# Logs Configuration
+logs_config:
+  container_collect_all: true
+  logs_enabled: true
+  processing_rules:
+    - type: mask_sequences
+      name: mask_sensitive_data
+      pattern: 'token":"[^"]*"'
+      replacement: 'token":"*****"'
+    - type: mask_sequences
+      name: mask_pii
+      pattern: 'email":"[^"]*"'
+      replacement: 'email":"*****"'
+
+# Process Configuration
+process_config:
+  enabled: true
+  intervals:
+    container: 10
+    process: 30
+  blacklist_patterns:
+    - '^/dev'
+    - '^/proc'
+    - '^/sys'
+
+# Monitors Configuration
+monitors:
+  # API Latency Monitor
+  - name: api_latency
+    type: metric alert
+    query: 'avg(last_5m):avg:rest_api.request.duration{*} > 0.5'
+    message: 'API response time is above 500ms threshold'
+    tags:
+      - 'service:rest-api'
+      - 'env:${DD_ENV}'
+    thresholds:
+      critical: 0.5
+      warning: 0.3
+
+  # Error Rate Monitor
+  - name: error_rate
+    type: metric alert
+    query: 'sum(last_5m):sum:rest_api.errors{*}.as_count()/sum:rest_api.requests{*}.as_count()*100 > 0.1'
+    message: 'Error rate exceeded 0.1% threshold'
+    tags:
+      - 'service:rest-api'
+      - 'env:${DD_ENV}'
+    thresholds:
+      critical: 0.1
+      warning: 0.05
+
+  # Request Rate Monitor
+  - name: request_rate
+    type: metric alert
+    query: 'avg(last_5m):sum:rest_api.requests{*}.as_count() > 1000'
+    message: 'Request rate exceeded 1000 requests/second'
+    tags:
+      - 'service:rest-api'
+      - 'env:${DD_ENV}'
+    thresholds:
+      critical: 1000
+      warning: 800
+
+# Integrations Configuration
+integrations:
+  # Ruby Integration
+  - name: ruby
+    init_config: {}
+    instances:
+      - service: rest-api
+        environment: ${DD_ENV}
+        trace_sample_rate: 1.0
+        analytics_enabled: true
+        profiling_enabled: true
+
+  # PostgreSQL Integration
+  - name: postgres
+    init_config: {}
+    instances:
+      - host: ${DB_HOST}
+        port: 5432
+        username: datadog
+        password: ${DD_PG_PASSWORD}
+        dbname: postgres
+        collect_function_metrics: true
+        collect_count_metrics: true
+        collect_activity_metrics: true
+
+  # Redis Integration
+  - name: redis
+    init_config: {}
+    instances:
+      - host: ${REDIS_HOST}
+        port: 6379
+        keys: ['*']
+        collect_info_metrics: true
+
+# JMX Configuration for Background Jobs
+jmx_config:
+  collect_default_metrics: true
+  custom_jars:
+    - /usr/local/sidekiq/lib/*.jar
+
+# Network Configuration
+network_config:
+  enabled: true
+  collect_connection_state: true
+  collect_tcp_stats: true
+  collect_dns_metrics: true
+
+# System Probe Configuration
+system_probe_config:
+  enabled: true
+  enable_tcp_queue_length: true
+  enable_oom_kill: true
+  enable_conntrack: true
+
+# Security Configuration
+security_config:
+  enabled: true
+  runtime_security_config:
+    enabled: true
+  compliance_config:
+    enabled: true
+
+# Custom Metrics Configuration
+custom_metrics:
+  - name: rest_api.job.processing_time
+    type: gauge
+    interval: 10
+  - name: rest_api.location.lookup_time
+    type: gauge
+    interval: 10
+  - name: rest_api.cache.hit_ratio
+    type: gauge
+    interval: 30
+
+# Health Check Configuration
+health_config:
+  enabled: true
+  timeout: 5
+  interval: 30
+
+# Logging Configuration
+logging:
+  level: INFO
+  format: json
+  include_patterns:
+    - /var/log/rest-api/*.log
+    - /var/log/nginx/*.log
+  exclude_patterns:
+    - /var/log/rest-api/*.gz
+    - /var/log/nginx/*.gz
+
+# Metadata Configuration
+metadata_config:
+  enabled: true
+  interval: 60
+  exclude_pause_container: true
