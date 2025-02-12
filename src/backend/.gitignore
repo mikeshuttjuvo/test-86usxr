@@ -1,0 +1,68 @@
+# Environment and Security
+.env
+.env.*
+*.env
+**/*.key
+*_credentials.yml
+/config/master.key
+/config/credentials.yml.enc
+**/*_credentials.yml.enc
+
+# Rails Application Files
+*.rbc
+.rspec
+capybara-*.html
+/log/**/*
+/tmp/**/*
+/public/system/**/*
+/coverage/**/*
+/spec/tmp/**/*
+/storage/**/*
+/public/assets/**/*
+/public/packs/**/*
+/public/packs-test/**/*
+
+# Dependencies and Packages
+/.bundle/**/*
+/vendor/bundle/**/*
+yarn-error.log
+.yarn-integrity
+node_modules/**/*
+
+# Database and Cache
+/db/*.sqlite3
+/db/*.sqlite3-*
+/db/*.sqlite3-journal
+dump.rdb
+*.dump
+*.sql
+
+# IDE and Editor
+.idea/**/*
+.vscode/**/*
+*.swp
+*.swo
+*.swn
+*.swm
+*.sublime-*
+
+# System Files
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# Debug and Development
+.byebug_history
+**/*.orig
+.ruby-version
+.ruby-gemset
+
+# Logs and Temporary
+**/*.log
+**/*.tmp
+**/*.bak
+**/*.backup
+
+# Docker
+.docker-sync/
+docker-compose.override.yml
