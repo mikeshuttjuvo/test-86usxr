@@ -1,0 +1,130 @@
+# Version: newrelic_rpm ~> 8.0
+# Purpose: NewRelic agent configuration for REST API service monitoring
+
+common: &default_settings
+  # License key from environment variable for security
+  license_key: <%= ENV['NEW_RELIC_LICENSE_KEY'] %>
+
+  # Application name from environment variable
+  app_name: <%= ENV['NEW_RELIC_APP_NAME'] %>
+
+  # Distributed tracing configuration
+  distributed_tracing:
+    enabled: true
+    exclude_newrelic_header: false
+    span_events_enabled: true
+    sampling_rate: 1.0
+    cross_application_tracing: true
+
+  # Transaction tracer configuration
+  transaction_tracer:
+    enabled: true
+    transaction_threshold: 0.5
+    record_sql: obfuscated
+    stack_trace_threshold: 0.5
+    explain_enabled: true
+    explain_threshold: 0.5
+    custom_parameters_enabled: true
+
+  # Error collection configuration
+  error_collector:
+    enabled: true
+    ignore_errors:
+      - ActionController::RoutingError
+      - ActiveRecord::RecordNotFound
+    capture_attributes: true
+    ignore_status_codes:
+      - 401
+      - 404
+    custom_attributes_enabled: true
+
+  # Analytics events configuration
+  analytics_events:
+    enabled: true
+    max_samples_stored: 10000
+    capture_attributes: true
+    custom_insights_events:
+      enabled: true
+      max_samples_stored: 5000
+
+  # SQL query monitoring
+  slow_sql:
+    enabled: true
+    max_samples: 100
+    explain_threshold: 0.5
+
+  # Custom instrumentation for security and API metrics
+  custom_instrumentation:
+    security_events:
+      enabled: true
+      collection_enabled: true
+      attributes_enabled: true
+    api_metrics:
+      enabled: true
+      record_throughput: true
+      record_latency: true
+
+# Production environment configuration
+production:
+  <<: *default_settings
+  monitor_mode: true
+  log_level: info
+
+  # Audit logging for production
+  audit_log:
+    enabled: true
+    sensitive_data_filtering: true
+
+  # Disable parameter capture for security
+  capture_params: false
+
+  # Transaction events configuration
+  transaction_events:
+    enabled: true
+    max_samples_per_minute: 1000
+    attributes_enabled: true
+
+  # Cross application tracing
+  cross_application_tracer:
+    enabled: true
+    custom_segments_enabled: true
+
+  # Thread profiler configuration
+  thread_profiler:
+    enabled: true
+    stack_trace_threshold: 0.5
+
+  # Security monitoring configuration
+  security_monitoring:
+    failed_logins:
+      enabled: true
+      threshold: 10
+      window_minutes: 1
+    rate_limiting:
+      enabled: true
+      threshold: 80
+      window_minutes: 60
+
+# Staging environment configuration
+staging:
+  <<: *default_settings
+  monitor_mode: true
+  app_name: <%= ENV['NEW_RELIC_APP_NAME'] %> (Staging)
+  log_level: debug
+  developer_mode: false
+  audit_log:
+    enabled: true
+
+# Development environment configuration
+development:
+  <<: *default_settings
+  monitor_mode: false
+  app_name: <%= ENV['NEW_RELIC_APP_NAME'] %> (Development)
+  developer_mode: true
+  log_level: debug
+
+# Test environment configuration
+test:
+  <<: *default_settings
+  monitor_mode: false
+  developer_mode: true
