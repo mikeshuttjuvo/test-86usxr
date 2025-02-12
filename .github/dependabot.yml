@@ -1,0 +1,76 @@
+version: 2
+
+updates:
+  # Ruby dependencies management
+  - package-ecosystem: "bundler"
+    directory: "/src/backend"
+    schedule:
+      interval: "daily"
+      time: "03:00"
+      timezone: "UTC"
+    allow:
+      - dependency-type: "direct"
+    versioning-strategy: "lockfile-only"
+    groups:
+      development:
+        patterns:
+          - "^rubocop"
+          - "^rspec"
+          - "^factory_bot"
+        update-types:
+          - "minor"
+          - "patch"
+      production:
+        patterns:
+          - "^rails"
+          - "^pg"
+          - "^redis"
+          - "^sidekiq"
+        update-types:
+          - "patch"
+    ignore:
+      - dependency-name: "rails"
+        update-types:
+          - "version-update:semver-major"
+    labels:
+      - "dependencies"
+      - "ruby"
+    reviewers:
+      - "@CODEOWNERS"
+    commit-message:
+      prefix: "chore(deps)"
+      include-scope: true
+
+  # Docker image updates
+  - package-ecosystem: "docker"
+    directory: "/src/backend"
+    schedule:
+      interval: "weekly"
+      day: "monday"
+      time: "03:00"
+      timezone: "UTC"
+    labels:
+      - "dependencies"
+      - "docker"
+    reviewers:
+      - "@CODEOWNERS"
+    commit-message:
+      prefix: "chore(deps)"
+      include-scope: true
+
+  # GitHub Actions updates
+  - package-ecosystem: "github-actions"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+      day: "monday"
+      time: "03:00"
+      timezone: "UTC"
+    labels:
+      - "dependencies"
+      - "github_actions"
+    reviewers:
+      - "@CODEOWNERS"
+    commit-message:
+      prefix: "chore(deps)"
+      include-scope: true
