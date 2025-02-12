@@ -1,0 +1,81 @@
+en:
+  api:
+    v1:
+      errors:
+        unauthorized:
+          title: "Unauthorized Access"
+          detail: "You are not authorized to perform this action. Please verify your credentials and permissions."
+          type: "https://api.example.com/errors/unauthorized"
+        not_found:
+          title: "Resource Not Found"
+          detail: "The requested resource could not be found. Please verify the identifier and try again."
+          type: "https://api.example.com/errors/not-found"
+        validation_failed:
+          title: "Validation Failed"
+          detail: "The provided data failed validation checks. Please review the errors and try again."
+          type: "https://api.example.com/errors/validation-failed"
+        rate_limit:
+          title: "Rate Limit Exceeded"
+          detail: "You have exceeded the rate limit of %{limit} requests per hour. Please try again after %{retry_after} seconds."
+          type: "https://api.example.com/errors/rate-limit"
+        internal_error:
+          title: "Internal Server Error"
+          detail: "An unexpected error occurred while processing your request. Our team has been notified."
+          type: "https://api.example.com/errors/internal-error"
+        security:
+          invalid_token:
+            title: "Invalid Token"
+            detail: "The provided authentication token is invalid or has expired."
+            type: "https://api.example.com/errors/security/invalid-token"
+          missing_token:
+            title: "Missing Token"
+            detail: "Authentication token is required but was not provided."
+            type: "https://api.example.com/errors/security/missing-token"
+      jobs:
+        success:
+          created: "Job was successfully created with ID: %{id}"
+          updated: "Job %{id} was successfully updated"
+          deleted: "Job %{id} was successfully deleted"
+          status_updated: "Job %{id} status was updated to %{status}"
+        validations:
+          title:
+            blank: "Title must be provided"
+            too_long: "Title exceeds maximum length of 255 characters"
+            format: "Title contains invalid characters"
+          description:
+            blank: "Description must be provided"
+            too_long: "Description exceeds maximum length"
+            format: "Description contains invalid formatting"
+          status:
+            invalid: "Status must be one of: %{valid_statuses}"
+            transition: "Invalid status transition from %{from} to %{to}"
+          dates:
+            start_date: "Start date must be a future date"
+            end_date: "End date must be after start date"
+            format: "Date must be in ISO 8601 format"
+      locations:
+        success:
+          created: "Location was successfully created with ID: %{id}"
+          updated: "Location %{id} was successfully updated"
+          deleted: "Location %{id} was successfully deleted"
+        validations:
+          name:
+            blank: "Name must be provided"
+            too_long: "Name exceeds maximum length of 255 characters"
+            format: "Name contains invalid characters"
+          address:
+            blank: "Address must be provided"
+            invalid: "Address format is invalid"
+            geocoding: "Unable to geocode the provided address"
+          coordinates:
+            latitude:
+              range: "Latitude must be between -90 and 90 degrees"
+              format: "Latitude must be a decimal number"
+            longitude:
+              range: "Longitude must be between -180 and 180 degrees"
+              format: "Longitude must be a decimal number"
+      pagination:
+        errors:
+          page_out_of_bounds: "Page number %{page} exceeds available pages"
+          invalid_per_page: "Per page value must be between %{min} and %{max}"
+          invalid_format: "Pagination parameters must be positive integers"
