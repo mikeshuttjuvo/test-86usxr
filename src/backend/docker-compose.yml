@@ -1,0 +1,186 @@
+version: '3.8'
+
+services:
+  nginx:
+    image: nginx:1.24-alpine
+    container_name: api_nginx
+    environment:
+      - NGINX_PORT=80
+      - NGINX_SSL_PORT=443
+      - API_HOST=api
+      - API_PORT=3000
+      - CLIENT_MAX_BODY_SIZE=10M
+    volumes:
+      - ./nginx/templates:/etc/nginx/templates:ro
+      - ./nginx/ssl:/etc/nginx/ssl:ro
+      - ./nginx/logs:/var/log/nginx
+    ports:
+      - "80:80"
+      - "443:443"
+    depends_on:
+      - api
+    networks:
+      - app-network
+    healthcheck:
+      test: ["CMD", "nginx", "-t"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+  api:
+    build:
+      context: .
+      target: development
+      args:
+        RUBY_VERSION: "3.2"
+        BUNDLER_VERSION: "2.4"
+    container_name: api_service
+    environment:
+      - RAILS_ENV=development
+      - DATABASE_URL=postgres://postgres:postgres@db:5432/app_development
+      - REDIS_URL=redis://redis:6379/0
+      - PORT=3000
+      - WEB_CONCURRENCY=2
+      - RAILS_MAX_THREADS=5
+      - RAILS_LOG_TO_STDOUT=true
+      - MALLOC_ARENA_MAX=2
+      - RUBY_GC_HEAP_GROWTH_MAX_SLOTS=40000
+      - RUBY_GC_HEAP_INIT_SLOTS=400000
+    volumes:
+      - .:/app:cached
+      - tmp-data:/app/tmp
+      - bundle-data:/usr/local/bundle
+      - ./log:/app/log
+    ports:
+      - "3000:3000"
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    networks:
+      - app-network
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:3000/health"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 40s
+    deploy:
+      resources:
+        limits:
+          cpus: '2'
+          memory: 2G
+
+  sidekiq:
+    build:
+      context: .
+      target: development
+      args:
+        RUBY_VERSION: "3.2"
+        BUNDLER_VERSION: "2.4"
+    container_name: api_sidekiq
+    command: bundle exec sidekiq -C config/sidekiq.yml
+    volumes:
+      - .:/app:cached
+      - bundle-data:/usr/local/bundle
+      - ./log:/app/log
+    environment:
+      - RAILS_ENV=development
+      - DATABASE_URL=postgres://postgres:postgres@db:5432/app_development
+      - REDIS_URL=redis://redis:6379/0
+      - MALLOC_ARENA_MAX=2
+      - RAILS_MAX_THREADS=25
+    depends_on:
+      - api
+      - redis
+      - db
+    networks:
+      - app-network
+    deploy:
+      resources:
+        limits:
+          cpus: '1'
+          memory: 1G
+
+  db:
+    image: postgres:14-alpine
+    container_name: api_postgres
+    environment:
+      - POSTGRES_USER=postgres
+      - POSTGRES_PASSWORD=postgres
+      - POSTGRES_DB=app_development
+      - PGDATA=/var/lib/postgresql/data/pgdata
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+    ports:
+      - "5432:5432"
+    networks:
+      - app-network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+    deploy:
+      resources:
+        limits:
+          cpus: '1'
+          memory: 1G
+
+  redis:
+    image: redis:6.2-alpine
+    container_name: api_redis
+    command: redis-server --appendonly yes
+    volumes:
+      - redis-data:/data
+    ports:
+      - "6379:6379"
+    networks:
+      - app-network
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+    deploy:
+      resources:
+        limits:
+          cpus: '0.5'
+          memory: 512M
+
+volumes:
+  postgres-data:
+    driver: local
+    driver_opts:
+      type: none
+      device: /var/lib/postgresql/data
+      o: bind
+  redis-data:
+    driver: local
+    driver_opts:
+      type: none
+      device: /var/lib/redis/data
+      o: bind
+  bundle-data:
+    driver: local
+  tmp-data:
+    driver: local
+
+networks:
+  app-network:
+    driver: bridge
+    ipam:
+      driver: default
+      config:
+        - subnet: 172.20.0.0/16
+    driver_opts:
+      encrypted: "true"
